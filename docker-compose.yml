@@ -1,0 +1,49 @@
+name: devsu-ms-accounts
+
+services:
+
+  postgres-accounts:
+    image: postgres:16-alpine
+    container_name: devsu-postgres-accounts
+    ports:
+      - "5471:5432"
+    environment:
+      POSTGRES_USER: accounts_user
+      POSTGRES_PASSWORD: accounts_pass
+      POSTGRES_DB: accounts_db
+    volumes:
+      - postgres-accounts-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U accounts_user -d accounts_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  ms-accounts:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: devsu/ms-accounts:latest
+    container_name: devsu-ms-accounts
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-accounts:5432/accounts_db
+      SPRING_DATASOURCE_USERNAME: accounts_user
+      SPRING_DATASOURCE_PASSWORD: accounts_pass
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      APP_KAFKA_TOPIC_CUSTOMER_EVENTS: customer-events
+    depends_on:
+      postgres-accounts:
+        condition: service_healthy
+    networks:
+      - default
+      - kafka-shared
+
+volumes:
+  postgres-accounts-data:
+
+networks:
+  kafka-shared:
+    name: devsu-kafka-shared
+    external: true
